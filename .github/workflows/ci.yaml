@@ -1,0 +1,215 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: CI
+
+on:
+  push:
+    branches: [master]
+    # Release tags. Without them listed, a tag push does not start this
+    # workflow at all, and the publish job could never run for a release.
+    tags: ['v[0-9]*']
+  pull_request:
+  # So an existing tag can be published without moving it: dispatch from the
+  # tag.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify gofmt
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "${unformatted}" ]; then
+            echo "::error::These files need gofmt:"
+            echo "${unformatted}"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      # The driver patch is exact-text edits against a pinned upstream file;
+      # check it still applies, and that no eval() survives it.
+      - name: Check the weewx driver patch
+        run: |
+          commit=$(sed -n 's/^ARG DRIVER_COMMIT=//p' weewx/Dockerfile)
+          curl -fsSL "https://raw.githubusercontent.com/captain-coredump/weatherflow-udp/${commit}/bin/user/weatherflowudp.py" -o /tmp/driver.py
+          python3 weewx/patch-driver.py /tmp/driver.py
+          python3 -m py_compile /tmp/driver.py
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+
+      - name: Check JavaScript syntax
+        run: node --check internal/web/static/app.js
+
+      - name: Spelling
+        run: |
+          go install github.com/client9/misspell/cmd/misspell@latest
+          "$(go env GOPATH)/bin/misspell" -error -locale US $(git ls-files '*.go' '*.md' '*.yaml' '*.html' '*.js' '*.css' '*.conf' '*.py')
+
+  image:
+    name: Image (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: dashboard
+            context: .
+            file: Dockerfile
+          - name: weewx
+            context: weewx
+            file: weewx/Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+
+      # What ships is two containers. A Dockerfile can break while every
+      # test passes, so every change builds both; publishing builds again
+      # below, so a pull request never needs a token that can push.
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: false
+
+  publish:
+    name: Publish (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    # Only once nothing that could call the build broken has.
+    needs: [build, lint, image]
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: dashboard
+            image: ghcr.io/${{ github.repository }}
+            context: .
+            file: Dockerfile
+          - name: weewx
+            image: ghcr.io/${{ github.repository }}-weewx
+            context: weewx
+            file: weewx/Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Tags and history: the version is `git describe`.
+          fetch-depth: 0
+
+      # On a tag this is exactly the tag; on master, the last release plus
+      # how far past it (v0.1.0-4-gfccf5ba).
+      - name: Derive the version
+        id: version
+        run: |
+          version=$(git describe --tags --match 'v[0-9]*' --always)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A release is published once. Re-pushing would change the bytes
+      # behind a version someone has deployed. After the login, so a private
+      # package's "unauthorized" is not read as "not published yet".
+      - name: Refuse to republish an existing release
+        if: github.ref_type == 'tag'
+        run: |
+          if docker manifest inspect "${{ matrix.image }}:${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "::error::${{ matrix.image }}:${{ github.ref_name }} already exists. Cut the next version instead."
+            exit 1
+          fi
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          flavor: latest=false
+          # v0.1.0: the release, identical to the git tag. latest: the newest
+          # release, never the branch. edge: the tip of master. sha-...: every
+          # build, immutable.
+          tags: |
+            type=raw,value=${{ github.ref_name }},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,format=long
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # .dockerignore excludes .git, so the version cannot be derived
+          # inside the build; it arrives here. The weewx image ignores it.
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+          provenance: false
+
+      - name: Verify the dashboard reports its own version
+        if: github.ref_type == 'tag' && matrix.name == 'dashboard'
+        run: |
+          reported=$(docker run --rm "${{ matrix.image }}:${{ github.ref_name }}" version)
+          echo "reported: $reported"
+          if [ "$reported" != "${{ github.ref_name }}" ]; then
+            echo "::error::the image reports '$reported', not ${{ github.ref_name }}."
+            exit 1
+          fi
+
+      - name: Verify weewx starts far enough to name its version
+        if: matrix.name == 'weewx'
+        run: docker run --rm "${{ matrix.image }}:sha-${{ github.sha }}" --version
+
+      - name: Report what was published
+        run: |
+          {
+            echo "### Published \`${{ matrix.image }}\` \`${{ steps.version.outputs.version }}\`"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo 'Digest:'
+            echo '```'
+            echo '${{ matrix.image }}@${{ steps.build.outputs.digest }}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

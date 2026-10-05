@@ -1,0 +1,12 @@
+# The weewx database. It grows by roughly 25 MB a year at a five-minute
+# archive interval. A block-backed storage class suits SQLite; avoid a network
+# file system, where its locking is unreliable.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: weewx-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

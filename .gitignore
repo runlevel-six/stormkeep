@@ -1,0 +1,16 @@
+# Machine-local tool settings
+/.claude/settings.local.json
+
+# Build output
+/bin/
+/tmp/
+coverage.out
+
+# A weewx database copied in for local testing
+*.sdb
+
+# A local kustomize overlay: hostname, network ranges, storage class and the
+# station's own weewx.conf (its location and IDs) stay out of the published
+# tree. It lives beside the base, not inside it: kustomize rejects a base
+# directory that contains its own overlay.
+/deploy-local/

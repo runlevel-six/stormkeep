@@ -1,0 +1,9 @@
+.git
+.github
+bin
+tmp
+docs
+deploy
+weewx
+coverage.out
+*.sdb

@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stormkeep
+spec:
+  # One writer for the SQLite file, and one owner of the host port: never two
+  # pods at once, not even during a rollout.
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      # The station's UDP broadcasts reach only the network they are sent
+      # on, so both containers listen from the node's network namespace. A
+      # pod network never sees them. See docs/explanation/design.md.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: weewx
+          image: stormkeep-weewx
+          args: ["/etc/weewx/weewx.conf"]
+          envFrom:
+            - configMapRef:
+                name: stormkeep-env
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: weewx-config
+              mountPath: /etc/weewx
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+        - name: dashboard
+          image: stormkeep
+          envFrom:
+            - configMapRef:
+                name: stormkeep-env
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            # On the host network this port is the node's: bind to the node's
+            # address only, on a port nothing else uses.
+            - name: WX_LISTEN
+              value: $(HOST_IP):8420
+            - name: WX_DB
+              value: /data/weewx.sdb
+          ports:
+            - name: http
+              containerPort: 8420
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: weewx-data
+        - name: weewx-config
+          configMap:
+            name: weewx-config
+        - name: tmp
+          emptyDir: {}

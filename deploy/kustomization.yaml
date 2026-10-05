@@ -1,0 +1,41 @@
+# The published base. It deploys weewx and the dashboard as one pod on the
+# host network, with placeholders for everything site-specific. Deploy it
+# through an overlay of your own: see docs/how-to/deploy.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: stormkeep
+    includeSelectors: true
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - pvc.yaml
+
+configMapGenerator:
+  # weewx's configuration. An overlay replaces it with the station's own
+  # (behavior: replace); a change rolls the pod.
+  - name: weewx-config
+    files:
+      - weewx.conf
+  # Environment for both containers. TZ must be the same in both: weewx
+  # starts each day's summary at local midnight, and the dashboard looks the
+  # days up by the same boundary.
+  - name: stormkeep-env
+    literals:
+      - TZ=UTC
+      - WX_NAME=Weather
+      - WX_UNITS=us
+      - WX_ALTITUDE=0
+      - WX_ALLOW_FROM=
+
+images:
+  - name: stormkeep
+    newName: ghcr.io/runlevel-six/stormkeep
+    newTag: latest
+  - name: stormkeep-weewx
+    newName: ghcr.io/runlevel-six/stormkeep-weewx
+    newTag: latest

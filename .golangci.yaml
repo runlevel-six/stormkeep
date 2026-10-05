@@ -1,0 +1,71 @@
+---
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - gocritic
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+
+  settings:
+    errcheck:
+      # Two categories, both deliberate.
+      #
+      # Writes to a response or to the process's own output: a failed write has
+      # nowhere left to report itself — the client is gone or stdout is gone —
+      # and checking each one would bury the writes that do matter.
+      #
+      # Close: the value is discarded on purpose. A failed Close on something
+      # only ever read tells you nothing you can act on.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - io.WriteString
+        - io.Copy
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*github.com/runlevel-six/stormkeep/internal/archive.Archive).Close
+        - (*os.File).Close
+        - (io.Closer).Close
+        - (net.Conn).Close
+        # A response write: the client is gone if it fails.
+        - (net/http.ResponseWriter).Write
+        - (net.PacketConn).Close
+    revive:
+      rules:
+        # Deliberately *without* the `exported` rule. This is an application,
+        # not a library: everything but package main lives under internal/,
+        # so there is no consumer whose API those comments would document.
+        - name: package-comments
+    misspell:
+      # American English: the tree is written in it, and flipping the locale
+      # would flag the spellings that are already correct here.
+      locale: US
+
+  exclusions:
+    rules:
+      # Table-driven tests get long and repetitive by design, and a test helper
+      # taking an argument every case happens to pass identically is still
+      # clearer than two helpers.
+      - path: _test\.go
+        linters: [unparam, gocritic, revive]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [github.com/runlevel-six/stormkeep]
+
+issues:
+  max-same-issues: 0
+  max-issues-per-linter: 0

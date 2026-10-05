@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-units="{{.Units}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Name}}</title>
+<link rel="icon" href="/static/icon.svg?v={{.Version}}" type="image/svg+xml">
+<link rel="icon" href="/static/icon-32.png?v={{.Version}}" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/static/icon-180.png?v={{.Version}}">
+<link rel="stylesheet" href="/static/app.css?v={{.Version}}">
+<script src="/static/app.js?v={{.Version}}" defer></script>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <h1>{{.Name}}</h1>
+    <p class="updated" id="updated" aria-live="polite"><span class="pulse" aria-hidden="true"></span><span id="updated-text">Connecting…</span></p>
+    <div class="units" role="group" aria-label="Units">
+      <button type="button" data-set-units="us" aria-pressed="false">°F, mph, in</button>
+      <button type="button" data-set-units="metric" aria-pressed="false">°C, km/h, mm</button>
+    </div>
+  </header>
+
+  <p class="banner" id="banner" role="status" hidden>
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 1.5 15 14H1z" class="warn-fill"/><path d="M8 6v4M8 11.6v.4" class="warn-ink"/></svg>
+    <span id="banner-text"></span>
+  </p>
+
+  <section class="hero" aria-labelledby="now-label">
+    <h2 id="now-label" class="visually-hidden">Now</h2>
+    <div class="hero-temp">
+      <p class="hero-value"><span id="temp">–</span></p>
+      <p class="hero-sub">Feels like <strong id="feels">–</strong></p>
+    </div>
+    <dl class="hero-facts">
+      <div><dt>Today's high</dt><dd><span id="today-high">–</span> <span class="when" id="today-high-at"></span></dd></div>
+      <div><dt>Today's low</dt><dd><span id="today-low">–</span> <span class="when" id="today-low-at"></span></dd></div>
+      <div><dt>Conditions</dt><dd id="summary">–</dd></div>
+    </dl>
+  </section>
+
+  <section class="tiles" aria-label="Current conditions">
+    <article class="tile tile-wind">
+      <h3>Wind</h3>
+      <div class="wind-body">
+        <svg class="compass" id="compass" viewBox="-60 -60 120 120" role="img" aria-labelledby="compass-label">
+          <title id="compass-label">Wind direction</title>
+          <circle r="50" class="compass-ring"/>
+          <g class="compass-ticks" id="compass-ticks"></g>
+          <text y="-36" class="compass-n">N</text>
+          <g id="compass-trail"></g>
+          <g id="compass-needle"><path d="M0 -50 L-7 -34 L7 -34 Z" class="needle"/></g>
+        </svg>
+        <div>
+          <p class="tile-value"><span id="wind-now">–</span></p>
+          <p class="tile-sub" id="wind-from">–</p>
+          <dl class="pairs">
+            <div><dt>Gust</dt><dd id="wind-gust">–</dd></div>
+            <div><dt>Lull</dt><dd id="wind-lull">–</dd></div>
+            <div><dt>Today's gust</dt><dd id="wind-today">–</dd></div>
+          </dl>
+        </div>
+      </div>
+      <svg class="spark" id="wind-spark" role="img" aria-label="Wind speed, last ten minutes" preserveAspectRatio="none"></svg>
+      <p class="tile-foot">Last ten minutes, every three seconds</p>
+    </article>
+
+    <article class="tile">
+      <h3>Humidity</h3>
+      <p class="tile-value"><span id="humidity">–</span></p>
+      <dl class="pairs">
+        <div><dt>Dew point</dt><dd id="dew">–</dd></div>
+      </dl>
+      <p class="tile-foot" id="dew-words"></p>
+    </article>
+
+    <article class="tile">
+      <h3>Pressure</h3>
+      <p class="tile-value"><span id="pressure">–</span></p>
+      <p class="tile-sub" id="pressure-trend">–</p>
+      <p class="tile-foot">At sea level. Change over three hours.</p>
+    </article>
+
+    <article class="tile">
+      <h3>Rain</h3>
+      <p class="tile-value"><span id="rain-today">–</span></p>
+      <p class="tile-sub" id="rain-rate">–</p>
+      <dl class="pairs">
+        <div><dt>Last hour</dt><dd id="rain-hour">–</dd></div>
+        <div><dt>Last 24 hours</dt><dd id="rain-day">–</dd></div>
+        <div><dt>Yesterday</dt><dd id="rain-yesterday">–</dd></div>
+        <div><dt>This month</dt><dd id="rain-month">–</dd></div>
+        <div><dt>This year</dt><dd id="rain-year">–</dd></div>
+      </dl>
+    </article>
+
+    <article class="tile">
+      <h3>Sun</h3>
+      <p class="tile-value"><span id="uv">–</span> <span class="tile-unit">UV</span></p>
+      <p class="tile-sub" id="uv-words">–</p>
+      <dl class="pairs">
+        <div><dt>Solar radiation</dt><dd id="solar">–</dd></div>
+        <div><dt>Brightness</dt><dd id="lux">–</dd></div>
+      </dl>
+    </article>
+
+    <article class="tile">
+      <h3>Lightning</h3>
+      <p class="tile-value"><span id="strikes">–</span></p>
+      <p class="tile-sub" id="strike-last">–</p>
+      <p class="tile-foot">Strikes heard in the last three hours</p>
+    </article>
+  </section>
+
+  <section class="history" aria-labelledby="history-label">
+    <div class="history-head">
+      <h2 id="history-label">History</h2>
+      <div class="range" role="group" aria-label="Time range">
+        <button type="button" data-range="day" aria-pressed="true">24 hours</button>
+        <button type="button" data-range="week" aria-pressed="false">7 days</button>
+        <button type="button" data-range="month" aria-pressed="false">30 days</button>
+        <button type="button" data-range="year" aria-pressed="false">1 year</button>
+      </div>
+    </div>
+    <div class="charts" id="charts"></div>
+    <details class="table-view">
+      <summary>Show the data as a table</summary>
+      <div class="table-wrap" id="table-wrap"></div>
+    </details>
+  </section>
+
+  <section class="records" aria-labelledby="records-label">
+    <h2 id="records-label">Records <span class="when" id="records-since"></span></h2>
+    <dl class="record-list">
+      <div><dt>Hottest</dt><dd id="rec-high">–</dd></div>
+      <div><dt>Coldest</dt><dd id="rec-low">–</dd></div>
+      <div><dt>Strongest gust</dt><dd id="rec-gust">–</dd></div>
+      <div><dt>Wettest day</dt><dd id="rec-wet">–</dd></div>
+    </dl>
+  </section>
+
+  <footer class="foot">
+    <p id="health">–</p>
+    <p class="version">stormkeep {{.Version}}</p>
+  </footer>
+</div>
+<div class="tooltip" id="tooltip" role="presentation" hidden></div>
+</body>
+</html>

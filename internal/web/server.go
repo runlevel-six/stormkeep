@@ -48,6 +48,10 @@ type Config struct {
 	// Done is closed when the server is shutting down, so open event streams
 	// end instead of holding the shutdown up.
 	Done <-chan struct{}
+
+	// Now replaces time.Now when set. For tests: what the API returns
+	// depends on where the current time falls within a chart's buckets.
+	Now func() time.Time
 }
 
 type server struct {
@@ -71,10 +75,13 @@ func Handler(cfg Config) http.Handler {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
 	s := &server{
 		cfg:   cfg,
 		index: template.Must(template.New("index").Parse(indexHTML)),
-		now:   time.Now,
+		now:   cfg.Now,
 		cache: map[string]cached{},
 	}
 	static, err := fs.Sub(staticFS, "static")

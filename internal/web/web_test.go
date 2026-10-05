@@ -232,13 +232,37 @@ func TestHistory(t *testing.T) {
 		}
 	}
 	m := decode(t, get(t, h, "/api/history?range=day", ""))
-	temps := m["temp"].([]any)
-	if temps[len(temps)-1] != 20.0 {
-		t.Errorf("newest temperature %v", temps[len(temps)-1])
-	}
 	// A 10-minute bucket holds two 5-minute records of 0.2 mm.
 	if r := m["rain"].([]any)[10]; r != 0.4 {
 		t.Errorf("rain per bucket %v", r)
+	}
+}
+
+// The newest point of the day chart is the 10-minute bucket now is in. weewx
+// stamps a record with the end of its interval, so for the first five minutes
+// of every ten that bucket has no record yet and must read as a gap, with the
+// point before it holding the newest data. This failed in CI at 16:43 and
+// passed locally at 16:46, before the clock was fixed.
+func TestHistoryNewestBucket(t *testing.T) {
+	base := time.Date(2026, 10, 5, 16, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		minute    int
+		newestNil bool
+	}{
+		{43, true},  // records up to 16:40, which belongs to 16:30-16:40
+		{46, false}, // the 16:45 record lands in 16:40-16:50
+	} {
+		now := base.Add(time.Duration(tt.minute) * time.Minute)
+		h, _ := newHandler(t, weewxDB(t, now), Config{Now: func() time.Time { return now }})
+		temps := decode(t, get(t, h, "/api/history?range=day", ""))["temp"].([]any)
+		newest, before := temps[len(temps)-1], temps[len(temps)-2]
+		if tt.newestNil {
+			if newest != nil || before != 20.0 {
+				t.Errorf("16:%d: newest %v, before it %v; want a gap, then 20", tt.minute, newest, before)
+			}
+		} else if newest != 20.0 {
+			t.Errorf("16:%d: newest %v, want 20", tt.minute, newest)
+		}
 	}
 }
 

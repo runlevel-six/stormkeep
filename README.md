@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo-with-name.png" alt="Stormkeep: self-hosted weather dashboard" width="640">
+</p>
+
 # Stormkeep
 
 A live dashboard for a WeatherFlow Tempest weather station, and the weewx that

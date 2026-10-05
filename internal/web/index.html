@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>{{.Name}}</title>
-<link rel="icon" href="/static/icon.svg?v={{.Version}}" type="image/svg+xml">
 <link rel="icon" href="/static/icon-32.png?v={{.Version}}" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/static/icon-180.png?v={{.Version}}">
 <link rel="stylesheet" href="/static/app.css?v={{.Version}}">
@@ -14,7 +13,7 @@
 <body>
 <div class="page">
   <header class="top">
-    <h1>{{.Name}}</h1>
+    <h1><img class="mark" src="/static/logo-96.png?v={{.Version}}" width="40" height="40" alt="">{{.Name}}</h1>
     <p class="updated" id="updated" aria-live="polite"><span class="pulse" aria-hidden="true"></span><span id="updated-text">Connecting…</span></p>
     <div class="units" role="group" aria-label="Units">
       <button type="button" data-set-units="us" aria-pressed="false">°F, mph, in</button>

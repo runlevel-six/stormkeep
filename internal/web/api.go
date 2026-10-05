@@ -138,7 +138,14 @@ func (s *server) handleNow(w http.ResponseWriter, r *http.Request) {
 func (s *server) now0(ctx context.Context) nowResponse {
 	var resp nowResponse
 	resp.Name = s.cfg.Name
-	resp.Health.Battery = num(math.NaN())
+	// Everything a failed query would leave unset starts as null, not zero: a
+	// zero high is 0 °C, which the page would show as a real 32 °F.
+	nan := num(math.NaN())
+	none := extreme{Value: nan}
+	resp.Health.Battery = nan
+	resp.Today.High, resp.Today.Low, resp.Today.Gust, resp.Today.Strikes = none, none, none, nan
+	resp.Rain.Hour, resp.Rain.Day, resp.Rain.Today, resp.Rain.Yesterday, resp.Rain.Month, resp.Rain.Year = nan, nan, nan, nan, nan, nan
+	resp.Records.High, resp.Records.Low, resp.Records.Gust, resp.Records.Wettest = none, none, none, none
 	fail := func(what string, err error) {
 		s.cfg.Log.Warn("api/now", "part", what, "err", err)
 		resp.Errors = append(resp.Errors, what)

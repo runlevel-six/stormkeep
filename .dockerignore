@@ -3,6 +3,7 @@
 bin
 tmp
 docs
+assets
 deploy
 weewx
 coverage.out

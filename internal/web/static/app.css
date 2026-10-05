@@ -64,7 +64,8 @@ button { font: inherit; color: inherit; }
 
 /* Header */
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 16px; }
-.top h1 { font-size: 1.25rem; font-weight: 600; margin-right: auto; }
+.top h1 { font-size: 1.25rem; font-weight: 600; margin-right: auto; display: flex; align-items: center; gap: 10px; }
+.top h1 .mark { width: 40px; height: 40px; flex: none; }
 .updated { color: var(--ink-2); font-size: 0.875rem; display: flex; align-items: center; gap: 6px; }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .updated.is-live .pulse { background: var(--series-1); animation: pulse 3s ease-out infinite; }

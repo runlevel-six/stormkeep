@@ -213,6 +213,17 @@ func TestNowWithoutArchive(t *testing.T) {
 	if len(errs) == 0 || errs[0] != "archive" {
 		t.Errorf("errors %v", m["errors"])
 	}
+	// What the archive would have supplied is null, never zero: a zero high
+	// is a real-looking 32 °F on the page.
+	if hi := m["today"].(map[string]any)["high"].(map[string]any)["v"]; hi != nil {
+		t.Errorf("today's high without an archive: %v, want null", hi)
+	}
+	if r := m["rain"].(map[string]any)["today"]; r != nil {
+		t.Errorf("rain today without an archive: %v, want null", r)
+	}
+	if rec := m["records"].(map[string]any)["low"].(map[string]any)["v"]; rec != nil {
+		t.Errorf("record low without an archive: %v, want null", rec)
+	}
 	if w := get(t, h, "/api/history?range=day", ""); w.Code != http.StatusServiceUnavailable {
 		t.Errorf("history without an archive: %d", w.Code)
 	}
